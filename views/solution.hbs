@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Turtle</title>
+    <meta charset="UTF-8">
+    <style type="text/css">
+        body {
+            padding: 0;
+            margin: 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+    <script>
+        // @ts-check
+
+        const init = () => {
+            /** @type HTMLCanvasElement */
+            const canvas = document.getElementsByTagName('CANVAS')[0];
+            const c = canvas.getContext('2d');
+
+            // Resize the canvas
+            const resize = () => {
+                canvas.width = canvas.clientWidth * window.devicePixelRatio;
+                canvas.height = canvas.clientHeight * window.devicePixelRatio;
+
+                cancelAnimationFrame(cancelId);
+                cancelId = requestAnimationFrame(draw);
+            };
+            window.onresize = resize;
+
+            const raw = `{{program}}`;
+            const program = raw.split(/([DUMTHWE])/).filter(r => !!r);
+
+            const pencil = new Image();
+            pencil.onload = function () {
+                resize();
+            };
+            pencil.src = "/pencil.svg";
+
+            var cancelId = 0;
+            let step = 0;
+            let totalMove = 1;
+            function draw() {
+                canvas.width = canvas.width;
+                c.translate(canvas.width * 0.5, canvas.height * 0.5);
+
+                c.lineWidth = 2;
+
+                let pos = [0, 0];
+                let dir = 0;
+                c.moveTo(...pos);
+                let i = 0;
+
+                let penState = false;
+                let loopCount = [];
+                let loopPointer = [];
+
+                let tempTotalMove = 0;
+
+                outer:
+                while (i <= step) {
+                    let command = program[i++];
+                    switch (command) {
+                        case 'D':
+                            penState = true;
+                            break;
+                        case 'U':
+                            penState = false;
+                            break;
+                        case 'M':
+                            var param = parseInt(program[i++], 10);
+                            let realMove = Math.min(tempTotalMove + param, totalMove) - tempTotalMove;
+                            tempTotalMove += realMove;
+                            pos[0] += realMove * Math.cos(dir * Math.PI / 180);
+                            pos[1] += realMove * Math.sin(dir * Math.PI / 180);
+                            if (penState) {
+                                c.lineTo(...pos);
+                                c.stroke();
+                            } else {
+                                c.moveTo(...pos);
+                            }
+                            if (realMove != param) {
+                                step--;
+                                break outer;
+                            }
+                            break;
+                        case 'T':
+                            var param = parseInt(program[i++], 10);
+                            dir += param;
+                            break;
+                        case 'H':
+                            pos = [0, 0];
+                            dir = 0;
+                            c.moveTo(...pos);
+                            break;
+                        case 'W':
+                            var param = parseInt(program[i++], 10);
+                            loopPointer.unshift(i);
+                            loopCount.unshift(param);
+                            break;
+                        case 'E':
+                            if (!loopCount.length || !loopPointer.length) throw new Error('E without W');
+                            if (loopCount[0] > 1) {
+                                loopCount[0] = loopCount[0] - 1;
+                                i = loopPointer[0];
+                            } else {
+                                loopCount.shift();
+                                loopPointer.shift();
+                            }
+                            break;
+                    }
+                }
+                if (penState) {
+                    c.drawImage(pencil, pos[0], pos[1] - 15, 15, 15);
+                } else {
+                    c.save();
+                    c.transform(1, 0, 0, 1, pos[0] + 4, pos[1] - 15);
+                    c.rotate(15 * Math.PI / 180);
+                    c.drawImage(pencil, 0, 0, 15, 15);
+                    c.restore();
+                }
+
+                if (++step == program.length) {
+                    // Done
+                    step = 0;
+                    totalMove = 0;
+                } else {
+                    totalMove += 3;
+                    cancelId = requestAnimationFrame(draw);
+                }
+            }
+        }
+    </script>
+</head>
+
+<body onload="init()">
+    <canvas></canvas>
+</body>
+
+</html>
